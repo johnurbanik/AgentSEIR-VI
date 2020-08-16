@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "abm-seir"
+version = "0.1.0"
+description = "Exploring a simple agent-based SEIR model using numpyro"
+authors = ["John Urbanik <johnurbanik@gmail.com>"]
+license = "Apache-2.0"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpyro = "^0.3.0"
+numpy = "^1.19.1"
+mesa = "^0.8.7"
+jupyterlab = "^2.2.4"
+pandas = "^1.1.0"
+matplotlib = "^3.3.1"
+
+[tool.poetry.dev-dependencies]
+black = {version = "^19.10b0", allow-prereleases = true}
+pylint = "^2.5.3"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
