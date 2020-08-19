@@ -5,10 +5,10 @@ from mesa import Agent, Model
 from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
 
-import numpy as np
-import pandas as pd
+import jax.numpy as np
+import jax.pandas as pd
 
-from model.utils import log_to_file
+from agentseir_vi.model.utils import log_to_file
 
 class Epidemic(BaseScheduler):
     '''

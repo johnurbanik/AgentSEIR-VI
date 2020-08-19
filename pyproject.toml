@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "abm-seir"
+name = "agentseir-vi"
 version = "0.1.0"
-description = "Exploring a simple agent-based SEIR model using numpyro"
+description = "Exploring an agent-based SEIR model using numpyro"
 authors = ["John Urbanik <johnurbanik@gmail.com>"]
 license = "Apache-2.0"
 
