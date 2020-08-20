@@ -52,13 +52,13 @@ class BaseScenarioParams:
     # NB: Actually comprises both exposed and presymptomatic, but useful to divide this way as agent symptoms will change awareness.
     INCUBATION_PERIOD = (6.47, 1.41)  # Gamma distribution scale and rate. Mean 4.58.
     PROPORTION_PRESYMPTOMATIC_TRANSMISSION = (.45, .2, 0, 1) # Truncated normal on range (0,1) with std dev of .2. May actually be more like a mixture?
-    SYMPTOMATIC_RATE = (2, 4/3)  # Beta, mean of 0.6. Rate of people that have the virus and will manifest symptoms
+    SYMPTOMATIC = (1, 0.6)  # Binomial. Rate of people that have the virus and will manifest symptoms
 
     # TODO: These are really age dependent!
     PRESYMPTOMATIC_CONTAGIOUS_PERIOD = (4/3, .8) # Gamma distribution shape and rate. Mean 2, SD 1.74.
     ASYMPTOMATIC_CONTAGIOUS_PERIOD = (8.45, 1.3)  # Gamma distribution shape and rate. Mean 6.5
     SYMPTOMATIC_CONTAGIOUS_PERIOD = (9.8, 1.43)  # Gamma distribution shape and rate. Mean 7.
-    # RECOVERY_PERIOD = ()  # TODO: Account for # longcovid, instead of considering agents recovered immediately after they
+    # RECOVERY_PERIOD = ()  # TODO: Account for # longcovid, instead of considering agents recovered immediately after they are no longer infectious.
 
     SYMPTOM_TO_HOSP_PERIOD = (5, 2, 0, 20)  # TODO: Truncated normal, should probably be gamma distributed instead.
     HOSP_DEATH_PERIOD = (9.5, 1)  # TODO: better gamma distribution
@@ -78,9 +78,9 @@ class BaseScenarioParams:
         if params.PROPORTION_PRESYMPTOMATIC_TRANSMISSION is not None:
             self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION = params.PROPORTION_PRESYMPTOMATIC_TRANSMISSION
         self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION = numpyro.sample('pP', dist.TruncatedNormal(*self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION))
-        if params.SYMPTOMATIC_RATE is not None:
-            self.SYMPTOMATIC_RATE = params.SYMPTOMATIC_RATE
-        self.SYMPTOMATIC_RATE = numpyro.sample('rS', dist.Beta(*self.SYMPTOMATIC_RATE))
+        if params.SYMPTOMATIC is not None:
+            self.SYMPTOMATIC = params.SYMPTOMATIC
+        self.SYMPTOMATIC = numpyro.sample('rS', dist.Beta(*self.SYMPTOMATIC))
 
         if params.PRESYMPTOMATIC_CONTAGIOUS_PERIOD is not None:
             self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD = params.PRESYMPTOMATIC_CONTAGIOUS_PERIOD
@@ -102,3 +102,7 @@ class BaseScenarioParams:
             self.HOSP_RECOVERY_PERIOD  = params.HOSP_RECOVERY_PERIOD
         self.HOSP_RECOVERY_PERIOD = numpyro.sample('hR', dist.Gamma(*self.HOSP_RECOVERY_PERIOD))
 
+        # Derived variables
+        self.EXPOSED_PERIOD = self.INCUBATION_PERIOD - self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD
+        self.RECOVERY_PERIOD = self.INCUBATION_PERIOD + np.where(self.SYMPTOMATIC > 0, self.SYMPTOMATIC_CONTAGIOUS_PERIOD, self.ASYMPTOMATIC_CONTAGIOUS_PERIOD)
+        # TODO: also track hospitalization period, etc. self.SYMPTOMATIC_TO_HOSP_PERIOD

@@ -6,7 +6,9 @@ from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
 
 import jax.numpy as np
-import jax.pandas as pd
+
+import numpyro
+import numpyro.distributions as dist
 
 from agentseir_vi.model.utils import log_to_file
 
@@ -109,24 +111,22 @@ class Population(Model):
         self.scheduler = Epidemic(self)
 
 
-    def init_agents(self, pop_size=(1e3, 1e3)):
-        # Numpyro code will go here, passed in via self.params
-        # For a first pass, we'll initialize the numpy arrays.
+    def init_agents(self, pop_size=(1e3, 1e3), initial_infections=2):
+        self.age = numpyro.sample('age', dist.Uniform(0, 100))
+        self.sex =  numpyro.sample('sex', dist.Binomial(1, .5))
+        self.risk_tolerance = numpyro.sample('risk', dist.Beta(2, 5))
+        self.risk_factors = numpyro.sample('health', dist.Binomial(5, .3))
+        self.hygiene = numpyro.sample('hygiene', dist.Beta(2, 5))
+        self.worker_type = numpyro.sample('worker_type', dist.Categorical((.6, .1, .2, .1)))
 
-        self.age = np.random.uniform(0, 100, size=pop_size)  # Terrible distribution, we should use random.choice from a discrete age distribution
-        self.sex = np.random.binomial(1, .5, size=pop_size)
-        self.risk_tolerance = np.random.beta(2,5, size=pop_size)  # Random values for now
-        self.risk_factors = np.random.binomial(5, .3, size=pop_size)
-        self.hygiene = np.random.beta(2,5, size=pop_size)  # Random values for now
-        self.worker_class = np.random.choice(3, size=pop_size, p=(.6, .1, .2, .1))
+        self.epidemic_state = numpyro.sample('state', dist.Binomial(1, initial_infections/pop_size[0]*pop_size[1]))
+        self.initial_social_radius = numpyro.sample('radius', dist.Binomial(10, .2))
+        self.awareness = numpyro.sample('awareness', dist.Beta(2, 2))
 
+        # The lengths of the infection are handled on a per agent basis via scenarios, these are just placeholders.
+        self.date_infected = np.where(self.epidemic_state > 0, np.zeros(shape=pop_size), np.full(shape=pop_size, fill_value=np.inf))
 
-        self.epidemic_state = np.zeros(shape=pop_size)
-        self.social_radius = np.random.binomial(10, .2, size=pop_size)
-        self.awareness =  np.random.beta(2, 2, size=pop_size)
-
-        self.date_infected = np.full(shape=pop_size, fill_value=np.inf)
-        self.date_contagious = np.full(shape=pop_size, fill_value=np.inf)
+        self.date_contagious = np.where(self.epidemic_state > 0, np.ceil(self.EXPOSED_PERIOD), np.full(shape=pop_size, fill_value=np.inf))
         self.date_recovered = np.full(shape=pop_size, fill_value=np.inf)
         self.date_hospitalized = np.full(shape=pop_size, fill_value=np.inf)
         self.date_died = np.full(shape=pop_size, fill_value=np.inf)
