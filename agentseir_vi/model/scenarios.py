@@ -7,6 +7,10 @@ class BaseScenarioParams:
     '''
 
     # From https://mrc-ide.github.io/global-lmic-reports/parameters.html
+    HOSP_AGE_BRACKETS = np.array([14, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 79, 74, 79, 100])
+    HOSP_BY_BRACKET = np.array([0.1, 0.2, 0.5, 1.0, 1.6, 2.3, 2.9, 3.9, 7.2, 10.2, 11.7, 14.6, 17.7, 18.0]) / 100
+    DEATH_AGE_BRACKETS = np.array(39, 44, 49, 54, 59, 64, 69, 74, 79)
+    HOSP_DEATH_BY_BRACKET = np.array(1.3, 1.5, 1.9, 2.7, 4.2, 6.9, 10.5, 14.9, 20.3, 58.0) / 100
     HOSP_BY_AGE = {
         14: 0.1,
         19: 0.2,
@@ -22,7 +26,7 @@ class BaseScenarioParams:
         69: 11.7,
         74: 14.6,
         79: 17.7,
-        np.inf: 18.0
+        100: 18.0
     }
 
     HOSP_DEATH_BY_AGE = {
@@ -35,7 +39,7 @@ class BaseScenarioParams:
         69: 10.5,
         74: 14.9,
         79: 20.3,
-        np.inf: 58.0
+        100: 58.0
     }
 
     # R0 in NY as high as 4, but in China it was around 3.2
@@ -68,13 +72,13 @@ class BaseScenarioParams:
         '''
         Pull from passed parameters and initialize numpyro samplers.
         '''
-        if params.R0 is not None:
-            self.R0 = params.R0
-        self.R0 = numpyro.sample('r0', dist.Normal(*self.R0))
+        # if params.R0 is not None:
+        #     self.R0 = params.R0
+        # self.R0 = numpyro.sample('r0', dist.Normal(*self.R0))  # NB: Unused right now
 
-        if params.INCUBATION_PERIOD is not None:
-            self.INCUBATION_PERIOD = params.INCUBATION_PERIOD
-        self.INCUBATION_PERIOD = numpyro.sample('iP', dist.Gamma(*self.INCUBATION_PERIOD))
+        # if params.INCUBATION_PERIOD is not None:
+        #     self.INCUBATION_PERIOD = params.INCUBATION_PERIOD
+        # self.INCUBATION_PERIOD = numpyro.sample('iP', dist.Gamma(*self.INCUBATION_PERIOD))  # NB: unused right now
         if params.PROPORTION_PRESYMPTOMATIC_TRANSMISSION is not None:
             self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION = params.PROPORTION_PRESYMPTOMATIC_TRANSMISSION
         self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION = numpyro.sample('pP', dist.TruncatedNormal(*self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION))
@@ -105,4 +109,3 @@ class BaseScenarioParams:
         # Derived variables
         self.EXPOSED_PERIOD = self.INCUBATION_PERIOD - self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD
         self.RECOVERY_PERIOD = self.INCUBATION_PERIOD + np.where(self.SYMPTOMATIC > 0, self.SYMPTOMATIC_CONTAGIOUS_PERIOD, self.ASYMPTOMATIC_CONTAGIOUS_PERIOD)
-        # TODO: also track hospitalization period, etc. self.SYMPTOMATIC_TO_HOSP_PERIOD
