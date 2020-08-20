@@ -48,7 +48,7 @@ class Epidemic(BaseScheduler):
 
         # For each contagious person, infect some of its neighbors based on their hygiene and the contagious person's social radius.
         # Use jax.random instead of numpyro here to keep these deterministic.
-        # TODO: figure out a way to do this in a (more) vectorized manner. Probably some sort of kernel convolution method with each radius.
+        # TODO: figure out a way to do this in a (more) vectorized manner. Probably some sort of kernel convolution method with each radius. Should also look into numpyro's scan.
         for x,y in zip(*contagious):
             radius = self.model.social_radius[x, y]
             base_isolation = self.model.base_isolation[x, y]
@@ -134,6 +134,18 @@ class Epidemic(BaseScheduler):
         ).nonzero()
         self.model.epidemic_state[newly_recovered] = self.model.STATE_RECOVERED
 
+    def update_counts(self):
+        self.susceptible_count[self.time] = (self.model.epidemic_state == self.model.STATE_SUSCEPTIBLE).sum()
+        self.exposed_count[self.time] = (self.model.epidemic_state == self.model.STATE_EXPOSED).sum()
+        self.presymptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_PRESYMPTOMATIC).sum()
+        self.asymptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_ASYMPTOMATIC).sum()
+        self.symptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_SYMPTOMATIC).sum()
+        self.hospitalized_count[self.time] = (self.model.epidemic_state == self.model.STATE_HOSPITALIZED).sum()
+        self.infected_count[self.time] = self.presymptomatic_count[self.time] + self.asymptomatic_count[self.time] + self.symptomatic_count[self.time] + self.hospitalized_count[self.time]
+
+        self.recovered_count[self.time] = (self.model.epidemic_state == self.model.STATE_RECOVERED).sum()
+        self.died_count[self.time] = (self.model.epidemic_state == self.model.STATE_DEAD).sum()
+
 
 class Population(Model):
     '''
@@ -196,13 +208,15 @@ class Population(Model):
         # self.lockdown_level = 0.0  # Float 0-1
 
         # Counters
-        self.infected_count = np.zeros(shape=self.num_steps)
-        self.presymptomatic_count = np.zeros(shape=self.num_steps)
-        self.asymptomatic_count = np.zeros(shape=self.num_steps)
-        self.symptomatic_count = np.zeros(shape=self.num_steps)
-        self.hospitalized_count = np.zeros(shape=self.num_steps)
-        self.recovered_count = np.zeros(shape=self.num_steps)
-        self.died_count = np.zeros(shape=self.num_steps)
+        self.susceptible_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.exposed_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.presymptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.asymptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.symptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.hospitalized_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.infected_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.recovered_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.died_count = np.zeros(shape=self.num_steps, dtype=np.int)
 
         self.scheduler = Epidemic(self)
 
@@ -237,6 +251,17 @@ class Population(Model):
 
     def write_logs(self):
         current_time =  self.scheduler.time
+        data = dict(
+                    int(self.susceptible_count),
+                    int(self.exposed_count),
+                    int(self.presymptomatic_count),
+                    int(self.asymptomatic_count),
+                    int(self.symptomatic_count),
+                    int(self.hospitalized_count),
+                    int(self.infected_count),
+                    int(self.recovered_count),
+                    int(self.died_count)
+        )
         data = dict(
             time=current_time,
 
