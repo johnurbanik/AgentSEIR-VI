@@ -1,5 +1,6 @@
 import jax.numpy as np
 import numpyro.distributions as dist
+import numpyro as ny
 
 class BaseScenarioParams:
     '''
@@ -12,8 +13,8 @@ class BaseScenarioParams:
     HOSP_AGE_MAP =  np.repeat(
         HOSP_BY_BRACKET, HOSP_AGE_BRACKETS.diff()
     )
-    DEATH_AGE_BRACKETS = np.array(39, 44, 49, 54, 59, 64, 69, 74, 79, 100)
-    HOSP_DEATH_BY_BRACKET = np.array(1.3, 1.5, 1.9, 2.7, 4.2, 6.9, 10.5, 14.9, 20.3, 58.0) / 100
+    DEATH_AGE_BRACKETS = np.array([39, 44, 49, 54, 59, 64, 69, 74, 79, 100])
+    HOSP_DEATH_BY_BRACKET = np.array([1.3, 1.5, 1.9, 2.7, 4.2, 6.9, 10.5, 14.9, 20.3, 58.0]) / 100
     DEATH_MAP = np.repeat(
         HOSP_DEATH_BY_BRACKET, DEATH_AGE_BRACKETS.diff()
     )
@@ -50,37 +51,37 @@ class BaseScenarioParams:
         '''
         # if params.R0 is not None:
         #     self.R0 = params.R0
-        # self.R0 = numpyro.sample('r0', dist.Normal(*self.R0))  # NB: Unused right now
+        # self.R0 = ny.sample('r0', dist.Normal(*self.R0))  # NB: Unused right now
 
         # if params.INCUBATION_PERIOD is not None:
         #     self.INCUBATION_PERIOD = params.INCUBATION_PERIOD
-        # self.INCUBATION_PERIOD = numpyro.sample('iP', dist.Gamma(*self.INCUBATION_PERIOD))  # NB: unused right now
+        # self.INCUBATION_PERIOD = ny.sample('iP', dist.Gamma(*self.INCUBATION_PERIOD))  # NB: unused right now
         if params.PROPORTION_PRESYMPTOMATIC_TRANSMISSION is not None:
             self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION = params.PROPORTION_PRESYMPTOMATIC_TRANSMISSION
-        self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION = numpyro.sample('pP', dist.TruncatedNormal(*self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION))
+        self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION = ny.sample('pP', dist.TruncatedNormal(*self.PROPORTION_PRESYMPTOMATIC_TRANSMISSION))
         if params.SYMPTOMATIC is not None:
             self.SYMPTOMATIC = params.SYMPTOMATIC
-        self.SYMPTOMATIC = numpyro.sample('rS', dist.Beta(*self.SYMPTOMATIC))
+        self.SYMPTOMATIC = ny.sample('rS', dist.Beta(*self.SYMPTOMATIC))
 
         if params.PRESYMPTOMATIC_CONTAGIOUS_PERIOD is not None:
             self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD = params.PRESYMPTOMATIC_CONTAGIOUS_PERIOD
-        self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD = numpyro.sample('cP', dist.Gamma(*self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD))
+        self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD = ny.sample('cP', dist.Gamma(*self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD))
         if params.ASYMPTOMATIC_CONTAGIOUS_PERIOD is not None:
             self.ASYMPTOMATIC_CONTAGIOUS_PERIOD = params.ASYMPTOMATIC_CONTAGIOUS_PERIOD
-        self.ASYMPTOMATIC_CONTAGIOUS_PERIOD = numpyro.sample('cA', dist.Gamma(*self.ASYMPTOMATIC_CONTAGIOUS_PERIOD))
+        self.ASYMPTOMATIC_CONTAGIOUS_PERIOD = ny.sample('cA', dist.Gamma(*self.ASYMPTOMATIC_CONTAGIOUS_PERIOD))
         if params.SYMPTOMATIC_CONTAGIOUS_PERIOD is not None:
             self.SYMPTOMATIC_CONTAGIOUS_PERIOD  = params.SYMPTOMATIC_CONTAGIOUS_PERIOD
-        self.SYMPTOMATIC_CONTAGIOUS_PERIOD = numpyro.sample('cS', dist.Gamma(*self.SYMPTOMATIC_CONTAGIOUS_PERIOD))
+        self.SYMPTOMATIC_CONTAGIOUS_PERIOD = ny.sample('cS', dist.Gamma(*self.SYMPTOMATIC_CONTAGIOUS_PERIOD))
 
         if params.SYMPTOM_TO_HOSP_PERIOD is not None:
             self.SYMPTOM_TO_HOSP_PERIOD = params.SYMPTOM_TO_HOSP_PERIOD
-        self.SYMPTOM_TO_HOSP_PERIOD = numpyro.sample('pH', dist.TruncatedNormal(*self.SYMPTOM_TO_HOSP_PERIOD))
+        self.SYMPTOM_TO_HOSP_PERIOD = ny.sample('pH', dist.TruncatedNormal(*self.SYMPTOM_TO_HOSP_PERIOD))
         if params.HOSP_DEATH_PERIOD is not None:
             self.HOSP_DEATH_PERIOD = params.HOSP_DEATH_PERIOD
-        self.HOSP_DEATH_PERIOD = numpyro.sample('hD', dist.Gamma(*self.HOSP_DEATH_PERIOD))
+        self.HOSP_DEATH_PERIOD = ny.sample('hD', dist.Gamma(*self.HOSP_DEATH_PERIOD))
         if params.HOSP_RECOVERY_PERIOD is not None:
             self.HOSP_RECOVERY_PERIOD  = params.HOSP_RECOVERY_PERIOD
-        self.HOSP_RECOVERY_PERIOD = numpyro.sample('hR', dist.Gamma(*self.HOSP_RECOVERY_PERIOD))
+        self.HOSP_RECOVERY_PERIOD = ny.sample('hR', dist.Gamma(*self.HOSP_RECOVERY_PERIOD))
 
         # Derived variables
         self.EXPOSED_PERIOD = self.INCUBATION_PERIOD - self.PRESYMPTOMATIC_CONTAGIOUS_PERIOD

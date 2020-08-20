@@ -8,7 +8,7 @@ from mesa.datacollection import DataCollector
 import jax.numpy as np
 import jax.random as jrand
 
-import numpyro
+import numpyro as ny
 import numpyro.distributions as dist
 
 from agentseir_vi.model.utils import log_to_file
@@ -26,7 +26,8 @@ class Epidemic(BaseScheduler):
         # For now, just use super.
         # If we want to change how time is stepped through (i.e. different phases)
         # this would be where to do it.
-        self.PRNGKey = random.PRNGKey(0)  # TODO: Better seed
+        self.PRNGKey = jrand.PRNGKey(0)  # TODO: Better seed
+        self.params = self.model.params
         super().__init__(model)
 
     def step(self):
@@ -52,7 +53,7 @@ class Epidemic(BaseScheduler):
         for x,y in zip(*contagious):
             radius = self.model.social_radius[x, y]
             base_isolation = self.model.base_isolation[x, y]
-            nx, ny = np.meshgrid(
+            nx, ny = np.meshgrid(   # pylint: disable=unbalanced-tuple-unpacking
                 np.arange(x - radius, x + radius),
                 np.arange(y - radius, y + radius)
             )
@@ -67,12 +68,12 @@ class Epidemic(BaseScheduler):
             potentially_infected_hygiene = self.model.hygiene[infection_attempts[:, 0], infection_attempts[:, 1]]
             susceptible = self.model.epidemic_state[infection_attempts[:, 0], infection_attempts[:, 1]] == self.model.STATE_SUSCEPTIBLE
 
-            indexer = jrand.Bernoulli(
+            indexer = jrand.bernoulli(
                 self.PRNGKey,
                 potentially_infected_hygiene.ravel(),
                 len(infection_attempts)
             )
-            got_infected = np.zeros(self.model.epidemic_state.shape, dtype=np.bool)
+            got_infected = np.zeros(self.model.epidemic_state.shape, dtype=np.bool_)
             got_infected[potentially_infected_hygiene[indexer]] = True
 
             # Set the date to become infectious
@@ -124,7 +125,7 @@ class Epidemic(BaseScheduler):
             (self.model.will_die) &
             (self.model.date_died <= self.time)
         ).nonzero()
-        self.model.epidemic_state[newly_hospitalized] = self.model.STATE_DEAD
+        self.model.epidemic_state[newly_dead] = self.model.STATE_DEAD
 
         # Progress recovered to recovered if they won't die
         newly_recovered = np.asarray(
@@ -135,16 +136,16 @@ class Epidemic(BaseScheduler):
         self.model.epidemic_state[newly_recovered] = self.model.STATE_RECOVERED
 
     def update_counts(self):
-        self.susceptible_count[self.time] = (self.model.epidemic_state == self.model.STATE_SUSCEPTIBLE).sum()
-        self.exposed_count[self.time] = (self.model.epidemic_state == self.model.STATE_EXPOSED).sum()
-        self.presymptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_PRESYMPTOMATIC).sum()
-        self.asymptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_ASYMPTOMATIC).sum()
-        self.symptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_SYMPTOMATIC).sum()
-        self.hospitalized_count[self.time] = (self.model.epidemic_state == self.model.STATE_HOSPITALIZED).sum()
-        self.infected_count[self.time] = self.presymptomatic_count[self.time] + self.asymptomatic_count[self.time] + self.symptomatic_count[self.time] + self.hospitalized_count[self.time]
+        self.model.susceptible_count[self.time] = (self.model.epidemic_state == self.model.STATE_SUSCEPTIBLE).sum()
+        self.model.exposed_count[self.time] = (self.model.epidemic_state == self.model.STATE_EXPOSED).sum()
+        self.model.presymptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_PRESYMPTOMATIC).sum()
+        self.model.asymptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_ASYMPTOMATIC).sum()
+        self.model.symptomatic_count[self.time] = (self.model.epidemic_state == self.model.STATE_SYMPTOMATIC).sum()
+        self.model.hospitalized_count[self.time] = (self.model.epidemic_state == self.model.STATE_HOSPITALIZED).sum()
+        self.model.infected_count[self.time] = self.model.presymptomatic_count[self.time] + self.model.asymptomatic_count[self.time] + self.model.symptomatic_count[self.time] + self.model.hospitalized_count[self.time]
 
-        self.recovered_count[self.time] = (self.model.epidemic_state == self.model.STATE_RECOVERED).sum()
-        self.died_count[self.time] = (self.model.epidemic_state == self.model.STATE_DEAD).sum()
+        self.model.recovered_count[self.time] = (self.model.epidemic_state == self.model.STATE_RECOVERED).sum()
+        self.model.died_count[self.time] = (self.model.epidemic_state == self.model.STATE_DEAD).sum()
 
 
 class Population(Model):
@@ -208,40 +209,40 @@ class Population(Model):
         # self.lockdown_level = 0.0  # Float 0-1
 
         # Counters
-        self.susceptible_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.exposed_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.presymptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.asymptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.symptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.hospitalized_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.infected_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.recovered_count = np.zeros(shape=self.num_steps, dtype=np.int)
-        self.died_count = np.zeros(shape=self.num_steps, dtype=np.int)
+        self.susceptible_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.exposed_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.presymptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.asymptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.symptomatic_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.hospitalized_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.infected_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.recovered_count = np.zeros(shape=self.num_steps, dtype=np.int_)
+        self.died_count = np.zeros(shape=self.num_steps, dtype=np.int_)
 
         self.scheduler = Epidemic(self)
 
 
     def init_agents(self, num_steps=1000, pop_size=(1e2, 1e2), initial_infections=2):
-        self.age = numpyro.sample('age', dist.Uniform(0, 100))
-        self.sex =  numpyro.sample('sex', dist.Binomial(1, .5))
-        self.risk_tolerance = numpyro.sample('risk', dist.Beta(2, 5))
-        # self.risk_factors = numpyro.sample('health', dist.Binomial(5, .3))
-        self.hygiene = numpyro.sample('hygiene', dist.Beta(2, 5))
-        # self.worker_type = numpyro.sample('worker_type', dist.Categorical((.6, .1, .2, .1)))
+        self.age = ny.sample('age', dist.Uniform(0, 100))
+        self.sex =  ny.sample('sex', dist.Binomial(1, .5))
+        self.risk_tolerance = ny.sample('risk', dist.Beta(2, 5))
+        # self.risk_factors = ny.sample('health', dist.Binomial(5, .3))
+        self.hygiene = ny.sample('hygiene', dist.Beta(2, 5))
+        # self.worker_type = ny.sample('worker_type', dist.Categorical((.6, .1, .2, .1)))
 
-        self.epidemic_state = numpyro.sample('state', dist.Binomial(1, initial_infections/pop_size[0]*pop_size[1]))
-        self.social_radius = numpyro.sample('radius', dist.Binomial(10, .2))
-        self.base_isolation = numpyro.sample('base_isolation', dist.Beta(2, 2))
+        self.epidemic_state = ny.sample('state', dist.Binomial(1, initial_infections/pop_size[0]*pop_size[1]))
+        self.social_radius = ny.sample('radius', dist.Binomial(10, .2))
+        self.base_isolation = ny.sample('base_isolation', dist.Beta(2, 2))
 
         # TODO: make these depend on risk factors as well
-        self.will_be_hospitalized = numpyro.sample('hosp', dist.Binomial(1, self.params.HOSP_AGE_MAP[self.age]))
-        self.will_die = numpyro.sample('die', dist.Binomial(1, self.params.DEATH_MAP[self.age]))
+        self.will_be_hospitalized = ny.sample('hosp', dist.Binomial(1, self.params.HOSP_AGE_MAP[self.age]))
+        self.will_die = ny.sample('die', dist.Binomial(1, self.params.DEATH_MAP[self.age]))
 
         # The lengths of the infection are handled on a per agent basis via scenarios, these are just placeholders.
         self.date_infected = np.where(self.epidemic_state > 0, np.zeros(shape=pop_size), np.full(shape=pop_size, fill_value=np.inf))
 
         self.date_contagious = np.where(self.epidemic_state > 0, np.ceil(self.params.EXPOSED_PERIOD), np.full(shape=pop_size, fill_value=np.inf))
-        self.date_symptomatic = np.full(shape=pop_size, fill_value=)
+        self.date_symptomatic = np.full(shape=pop_size, fill_value=np.inf)
         self.date_recovered = np.full(shape=pop_size, fill_value=np.inf)
         self.date_hospitalized = np.full(shape=pop_size, fill_value=np.inf)
         self.date_died = np.full(shape=pop_size, fill_value=np.inf)
@@ -252,35 +253,18 @@ class Population(Model):
     def write_logs(self):
         current_time =  self.scheduler.time
         data = dict(
-                    int(self.susceptible_count),
-                    int(self.exposed_count),
-                    int(self.presymptomatic_count),
-                    int(self.asymptomatic_count),
-                    int(self.symptomatic_count),
-                    int(self.hospitalized_count),
-                    int(self.infected_count),
-                    int(self.recovered_count),
-                    int(self.died_count)
-        )
-        data = dict(
-            time=current_time,
-
-            current_exposed_cases=int((self.epidemic_state == self.STATE_EXPOSED).sum()),
-            current_contagious_cases=int(np.where(np.logical_and(
-                self.epidemic_state >= self.STATE_PRESYMPTOMATIC,
-                self.epidemic_state <= self.STATE_HOSPITALIZED
-            )).sum()),
-            current_hospitalized_cases=int((self.epidemic_state == self.STATE_HOSPITALIZED).sum()),
-
-            presymptomatic_count=int((self.epidemic_state == self.STATE_PRESYMPTOMATIC).sum()),
-            asymptomatic_count=int((self.epidemic_state == self.STATE_ASYMPTOMATIC).sum()),
-            symptomatic_count=int((self.epidemic_state == self.STATE_SYMPTOMATIC).sum()),
-
-            total_contagious_count=int((self.date_contagious < current_time).sum()),
-            total_infected_count=int((self.date_infected < current_time).sum()),
-            total_hospitalized_count=int((self.date_hospitalized < current_time).sum()),
-            total_died_count=int((self.date_died < current_time).sum()),
-            total_recovered_count=int((self.date_recovered < current_time).sum()),
+                    current_susceptible=int(self.susceptible_count),
+                    current_exposed=int(self.exposed_count),
+                    current_presymptomtic=int(self.presymptomatic_count),
+                    current_asymptomatic=int(self.asymptomatic_count),
+                    current_symptomatic=int(self.symptomatic_count),
+                    current_hospitalized=int(self.hospitalized_count),
+                    current_infected=int(self.infected_count),
+                    current_recovered=int(self.recovered_count),
+                    current_dead=int(self.died_count),
+                    total_contagious_count=int((self.date_contagious < current_time).sum()),
+                    total_infected_count=int((self.date_infected < current_time).sum()),
+                    total_hospitalized_count=int((self.date_hospitalized < current_time).sum()),
         )
         info = json.dumps(data)
         log_to_file(self.log_file, info)
