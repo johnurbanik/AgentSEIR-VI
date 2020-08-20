@@ -9,38 +9,14 @@ class BaseScenarioParams:
     # From https://mrc-ide.github.io/global-lmic-reports/parameters.html
     HOSP_AGE_BRACKETS = np.array([14, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 79, 74, 79, 100])
     HOSP_BY_BRACKET = np.array([0.1, 0.2, 0.5, 1.0, 1.6, 2.3, 2.9, 3.9, 7.2, 10.2, 11.7, 14.6, 17.7, 18.0]) / 100
-    DEATH_AGE_BRACKETS = np.array(39, 44, 49, 54, 59, 64, 69, 74, 79)
+    HOSP_AGE_MAP =  np.repeat(
+        HOSP_BY_BRACKET, HOSP_AGE_BRACKETS.diff()
+    )
+    DEATH_AGE_BRACKETS = np.array(39, 44, 49, 54, 59, 64, 69, 74, 79, 100)
     HOSP_DEATH_BY_BRACKET = np.array(1.3, 1.5, 1.9, 2.7, 4.2, 6.9, 10.5, 14.9, 20.3, 58.0) / 100
-    HOSP_BY_AGE = {
-        14: 0.1,
-        19: 0.2,
-        24: 0.5,
-        29: 1.0,
-        34: 1.6,
-        39: 2.3,
-        44: 2.9,
-        49: 3.9,
-        54: 5.8,
-        59: 7.2,
-        64: 10.2,
-        69: 11.7,
-        74: 14.6,
-        79: 17.7,
-        100: 18.0
-    }
-
-    HOSP_DEATH_BY_AGE = {
-        39: 1.3,
-        44: 1.5,
-        49: 1.9,
-        54: 2.7,
-        59: 4.2,
-        64: 6.9,
-        69: 10.5,
-        74: 14.9,
-        79: 20.3,
-        100: 58.0
-    }
+    DEATH_MAP = np.repeat(
+        HOSP_DEATH_BY_BRACKET, DEATH_AGE_BRACKETS.diff()
+    )
 
     # R0 in NY as high as 4, but in China it was around 3.2
     # Source: https://covid19-projections.com/infections-tracker/, among others

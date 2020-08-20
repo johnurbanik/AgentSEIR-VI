@@ -31,6 +31,7 @@ class Epidemic(BaseScheduler):
 
     def step(self):
         self.update_agent_states()  # Update the counts of the various states
+        self.update_counts()
         if self.model.log_file:
             self.model.write_logs()  # Write some logs, if enabled
 
@@ -38,7 +39,12 @@ class Epidemic(BaseScheduler):
 
         ############################# Transmission logic ###################################
         # Get all the currently contagious agents, and have them infect new agents.
-        contagious = np.asarray(self.model.state == self.model.STATE_CONTAGIOUS).nonzero()
+        # TODO: include hospital transmission, vary transmissability by state.
+        contagious = np.asarray(
+            (self.model.epidemic_state == self.model.STATE_PRESYMPTOMATIC) |
+            (self.model.epidemic_state == self.model.STATE_ASYMPTOMATIC) |
+            (self.model.epidemic_state == self.model.STATE_SYMPTOMATIC)
+        ).nonzero()
 
         # For each contagious person, infect some of its neighbors based on their hygiene and the contagious person's social radius.
         # Use jax.random instead of numpyro here to keep these deterministic.
@@ -59,30 +65,28 @@ class Epidemic(BaseScheduler):
                 shape=int(len(neighbor_inds) * (1 - base_isolation))
             )
             potentially_infected_hygiene = self.model.hygiene[infection_attempts[:, 0], infection_attempts[:, 1]]
-            susceptible = self.model.state[infection_attempts[:, 0], infection_attempts[:, 1]] == self.model.STATE_SUSCEPTIBLE
+            susceptible = self.model.epidemic_state[infection_attempts[:, 0], infection_attempts[:, 1]] == self.model.STATE_SUSCEPTIBLE
 
             indexer = jrand.Bernoulli(
                 self.PRNGKey,
                 potentially_infected_hygiene.ravel(),
                 len(infection_attempts)
             )
-            got_infected = np.zeros(self.model.state.shape, dtype=np.bool)
+            got_infected = np.zeros(self.model.epidemic_state.shape, dtype=np.bool)
             got_infected[potentially_infected_hygiene[indexer]] = True
 
             # Set the date to become infectious
-            self.model.state[got_infected & susceptible] = self.model.STATE_EXPOSED
+            self.model.epidemic_state[got_infected & susceptible] = self.model.STATE_EXPOSED
             self.model.date_infected[got_infected & susceptible] = self.time
             self.model.date_contagious[got_infected & susceptible] = self.time + self.params.EXPOSED_PERIOD
-
-
 
     def update_agent_states(self):
         # Get all of the newly contagious agents, swap them to being contagious
         newly_contagious = np.asarray(
             (self.model.date_contagious <= self.time) &
-            (self.model.epidemic_state < self.model.STATE_CONTAGIOUS)
+            (self.model.epidemic_state < self.model.STATE_PRESYMPTOMATIC)
         ).nonzero()
-        self.model.state[newly_contagious] = self.model.STATE_CONTAGIOUS
+        self.model.epidemic_state[newly_contagious] = self.model.STATE_PRESYMPTOMATIC
 
         # Also set the time in which they will become symptomatic, recover, die, etc.
         # This could also be done at transmission time.
@@ -90,6 +94,45 @@ class Epidemic(BaseScheduler):
         self.model.date_recovered[newly_contagious] = self.time + self.params.RECOVERY_PERIOD
         self.model.date_hospitalized[newly_contagious] = self.time + self.params.INCUBATION_PERIOD + self.params.SYMPTOM_TO_HOSP_PERIOD
         self.model.date_died[newly_contagious] = self.time + self.params.RECOVERY_PERIOD + self.params.SYMPTOM_TO_HOSP_PERIOD + self.params.HOSP_DEATH_PERIOD
+
+        # Progress presymptomatic to asymptomatic/symptomatic
+        newly_asymptomatic = np.asarray(
+            (self.model.epidemic_state == self.model.STATE_PRESYMPTOMATIC) &
+            (self.model.date_symptomatic <= self.time) &
+            ~(self.params.SYMPTOMATIC)
+        ).nonzero()
+        self.model.epidemic_state[newly_asymptomatic] = self.model.STATE_ASYMPTOMATIC
+
+        newly_symptomatic = np.asarray(
+            (self.model.epidemic_state == self.model.STATE_PRESYMPTOMATIC) &
+            (self.model.date_symptomatic <= self.time) &
+            ~(self.params.SYMPTOMATIC)
+        ).nonzero()
+        self.model.epidemic_state[newly_symptomatic] = self.model.STATE_SYMPTOMATIC
+
+        # Progress symptomatic to hospital
+        newly_hospitalized = np.asarray(
+            (self.model.will_be_hospitalized) &
+            (self.model.date_hospitalied <= self.time) &
+            (self.model.epidemic_state == self.model.STATE_SYMPTOMATIC)
+        ).nonzero()
+        self.model.epidemic_state[newly_hospitalized] = self.model.STATE_HOSPITALIZED
+
+        # Progress hospitalized to death
+        newly_dead = np.asarray(
+            (self.model.epidemic_state == self.model.STATE_HOSPITALIZED) &
+            (self.model.will_die) &
+            (self.model.date_died <= self.time)
+        ).nonzero()
+        self.model.epidemic_state[newly_hospitalized] = self.model.STATE_DEAD
+
+        # Progress recovered to recovered if they won't die
+        newly_recovered = np.asarray(
+            ~(self.model.will_die) &
+            (self.model.date_recovered <= self.time) &
+            (self.model.epidemic_state < self.model.STATE_RECOVERED)  # Small optimization?
+        ).nonzero()
+        self.model.epidemic_state[newly_recovered] = self.model.STATE_RECOVERED
 
 
 class Population(Model):
@@ -109,12 +152,14 @@ class Population(Model):
     STATE_DEAD = 6
     STATE_RECOVERED = 7
 
-    def __init__(self, params, log_file=None):
+    def __init__(self, N, params, log_file=None):
         '''
         params: class or dict containing the global parameters for the model.
         '''
         self.log_file = log_file
         self.params = params
+
+        self.num_steps = N
 
         # Agents
         # self.people = None  # ID array for easy reference
@@ -148,21 +193,21 @@ class Population(Model):
 
 
         # Global params:
-        self.lockdown_level = 0.0  # Float 0-1
+        # self.lockdown_level = 0.0  # Float 0-1
 
         # Counters
-        self.infected_count = 0
-        self.presymptomatic_count = 0
-        self.asymptomatic_count = 0
-        self.symptomatic_count = 0
-        self.hospitalized_count = 0
-        self.recovered_count = 0
-        self.died_count = 0
+        self.infected_count = np.zeros(shape=self.num_steps)
+        self.presymptomatic_count = np.zeros(shape=self.num_steps)
+        self.asymptomatic_count = np.zeros(shape=self.num_steps)
+        self.symptomatic_count = np.zeros(shape=self.num_steps)
+        self.hospitalized_count = np.zeros(shape=self.num_steps)
+        self.recovered_count = np.zeros(shape=self.num_steps)
+        self.died_count = np.zeros(shape=self.num_steps)
 
         self.scheduler = Epidemic(self)
 
 
-    def init_agents(self, pop_size=(1e2, 1e2), initial_infections=2):
+    def init_agents(self, num_steps=1000, pop_size=(1e2, 1e2), initial_infections=2):
         self.age = numpyro.sample('age', dist.Uniform(0, 100))
         self.sex =  numpyro.sample('sex', dist.Binomial(1, .5))
         self.risk_tolerance = numpyro.sample('risk', dist.Beta(2, 5))
@@ -173,6 +218,10 @@ class Population(Model):
         self.epidemic_state = numpyro.sample('state', dist.Binomial(1, initial_infections/pop_size[0]*pop_size[1]))
         self.social_radius = numpyro.sample('radius', dist.Binomial(10, .2))
         self.base_isolation = numpyro.sample('base_isolation', dist.Beta(2, 2))
+
+        # TODO: make these depend on risk factors as well
+        self.will_be_hospitalized = numpyro.sample('hosp', dist.Binomial(1, self.params.HOSP_AGE_MAP[self.age]))
+        self.will_die = numpyro.sample('die', dist.Binomial(1, self.params.DEATH_MAP[self.age]))
 
         # The lengths of the infection are handled on a per agent basis via scenarios, these are just placeholders.
         self.date_infected = np.where(self.epidemic_state > 0, np.zeros(shape=pop_size), np.full(shape=pop_size, fill_value=np.inf))
@@ -185,9 +234,6 @@ class Population(Model):
 
     def step(self):
         self.scheduler.step()
-
-    def set_status(self):
-        pass
 
     def write_logs(self):
         current_time =  self.scheduler.time
