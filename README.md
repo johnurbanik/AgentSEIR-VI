@@ -1,5 +1,9 @@
-# AgentSEIR-VI
 ### WARNING: Work in progress.
+
+This package is not yet functional + has not been tested. If you're interested in contributing, feel free to contact the author on [twitter](http://twitter.com/johnurbanik).
+
+# AgentSEIR-VI
+
 
 AgentSEIR-VI is a proof of concept of a scalable agent based model in Python. The model uses [Mesa](https://mesa.readthedocs.io/en/master/) as scaffolding, but as opposed to implementing individual agents, it uses a set of arrays to back the agent, allowing most operations to be vectorized and avoid the overhead of Python.
 
@@ -9,7 +13,7 @@ This serves multiple purposes:
 
 As an example of more complex modeling, consider the possibility of an agent that adapts its behavior based on the state of its spatial neighborhood, as well as agents making up a complex adaptive system wherein their contact network changes reactively based on information.
 
-Here, we utilize the PPL [numpyro](https://github.com/pyro-ppl/numpyro) for the purpose of inference. As of now, non-behavioral virus parameters are random variables with fixed parameters instead of being inferred because there are so many degrees of freedom.
+Here, we utilize the PPL [numpyro](https://github.com/pyro-ppl/numpyro) for inference, where both group level and individual level parameters are modeled.
 
 In the future, the model could be abstracted to allow more flexible specification of the states, decision heuristics, interaction topology, and environment. This would allow for modeling scenarios including different types of NPIs and behaviors.
 
